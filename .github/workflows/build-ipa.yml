@@ -43,6 +43,13 @@ jobs:
           cache: gradle
           cache-dependency-path: Mindustry/**/*.gradle*
 
+      - name: Fetch Arc iOS MetalANGLE frameworks
+        working-directory: Arc
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew :backends:backend-robovm:extractMetalANGLEKit --stacktrace
+
       - name: Configure unsigned iOS build
         shell: bash
         run: |
