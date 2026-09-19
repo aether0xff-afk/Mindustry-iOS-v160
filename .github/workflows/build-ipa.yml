@@ -1,0 +1,78 @@
+name: Build Mindustry v160 IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/build-ipa.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout builder repository
+        uses: actions/checkout@v4
+
+      - name: Checkout Mindustry v160
+        uses: actions/checkout@v4
+        with:
+          repository: Anuken/Mindustry
+          ref: v160
+          path: Mindustry
+          fetch-depth: 1
+
+      - name: Checkout matching Arc revision
+        uses: actions/checkout@v4
+        with:
+          repository: Anuken/Arc
+          ref: ae321d09e6
+          path: Arc
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: Mindustry/**/*.gradle*
+
+      - name: Configure unsigned iOS build
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("Mindustry/ios/build.gradle")
+          s = p.read_text()
+          old = "iosSkipSigning = false"
+          if old not in s:
+              raise SystemExit("Could not find iosSkipSigning setting")
+          p.write_text(s.replace(old, "iosSkipSigning = true", 1))
+          PY
+
+      - name: Build IPA
+        working-directory: Mindustry
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew ios:createIPA -Pbuildversion=160 --stacktrace
+
+      - name: Show generated IPA
+        if: always()
+        shell: bash
+        run: |
+          find Mindustry/ios/build -type f \( -name "*.ipa" -o -name "*.app" \) -print 2>/dev/null || true
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mindustry-v160-iOS
+          path: Mindustry/ios/build/**/*.ipa
+          if-no-files-found: error
+          retention-days: 7
