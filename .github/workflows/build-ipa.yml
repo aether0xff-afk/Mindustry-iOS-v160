@@ -58,6 +58,10 @@ jobs:
           mkdir -p ../Mindustry/ios/libs
           cp "$ARC_IOS_JAR" ../Mindustry/ios/libs/arc-ios-natives.jar
           echo "Using Arc iOS natives: $ARC_IOS_JAR"
+          jar tf "$ARC_IOS_JAR" | grep -q 'META-INF/robovm/ios/robovm.xml'
+          jar tf "$ARC_IOS_JAR" | grep -q 'META-INF/robovm/ios/libs/arc.xcframework/'
+          jar tf "$ARC_IOS_JAR" | grep -q 'arc.xcframework/ios-arm64/'
+          echo "Verified Arc RoboVM metadata and ios-arm64 framework."
 
       - name: Configure unsigned iOS build
         shell: bash
@@ -70,14 +74,23 @@ jobs:
           if old not in s:
               raise SystemExit("Could not find iosSkipSigning setting")
           s = s.replace(old, "iosSkipSigning = true", 1)
-          dep = '    implementation files("libs/arc-ios-natives.jar")\n'
-          marker = 'dependencies{\n'
-          if dep.strip() not in s:
-              if marker not in s:
-                  raise SystemExit("Could not find dependencies block")
-              s = s.replace(marker, marker + dep, 1)
+
+          marker = 'dependencies{\n    implementation project(":core")\n'
+          replacement = 'dependencies{\n    implementation project(":core")\n    implementation files("libs/arc-ios-natives.jar")\n'
+          if marker not in s:
+              raise SystemExit("Could not find the iOS project dependencies block")
+          s = s.replace(marker, replacement, 1)
           p.write_text(s)
           PY
+
+      - name: Verify patched iOS configuration
+        working-directory: Mindustry
+        shell: bash
+        run: |
+          grep -n 'implementation files("libs/arc-ios-natives.jar")' ios/build.gradle
+          grep -n 'iosSkipSigning = true' ios/build.gradle
+          test -s ios/libs/arc-ios-natives.jar
+          jar tf ios/libs/arc-ios-natives.jar | grep 'arc.xcframework/ios-arm64/' | head
 
       - name: Build IPA
         working-directory: Mindustry
