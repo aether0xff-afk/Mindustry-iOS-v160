@@ -43,12 +43,21 @@ jobs:
           cache: gradle
           cache-dependency-path: Mindustry/**/*.gradle*
 
-      - name: Fetch Arc iOS MetalANGLE frameworks
+      - name: Build Arc iOS natives and MetalANGLE frameworks
         working-directory: Arc
         shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew :backends:backend-robovm:extractMetalANGLEKit --stacktrace
+          ./gradlew :arc-core:jnigenBuildIOS :arc-core:jnigenPackageAllIOS :backends:backend-robovm:extractMetalANGLEKit --stacktrace
+          ARC_IOS_JAR="$(find arc-core/build/natives -maxdepth 1 -type f -name '*natives-ios*.jar' -print -quit)"
+          if [ -z "$ARC_IOS_JAR" ]; then
+            echo "Arc iOS natives jar was not generated."
+            find arc-core/build -maxdepth 4 -type f -print || true
+            exit 1
+          fi
+          mkdir -p ../Mindustry/ios/libs
+          cp "$ARC_IOS_JAR" ../Mindustry/ios/libs/arc-ios-natives.jar
+          echo "Using Arc iOS natives: $ARC_IOS_JAR"
 
       - name: Configure unsigned iOS build
         shell: bash
@@ -60,7 +69,14 @@ jobs:
           old = "iosSkipSigning = false"
           if old not in s:
               raise SystemExit("Could not find iosSkipSigning setting")
-          p.write_text(s.replace(old, "iosSkipSigning = true", 1))
+          s = s.replace(old, "iosSkipSigning = true", 1)
+          dep = '    implementation files("libs/arc-ios-natives.jar")\n'
+          marker = 'dependencies{\n'
+          if dep.strip() not in s:
+              if marker not in s:
+                  raise SystemExit("Could not find dependencies block")
+              s = s.replace(marker, marker + dep, 1)
+          p.write_text(s)
           PY
 
       - name: Build IPA
