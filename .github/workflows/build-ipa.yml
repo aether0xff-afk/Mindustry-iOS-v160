@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew :arc-core:jnigenBuildIOS :arc-core:jnigenPackageAllIOS :backends:backend-robovm:extractMetalANGLEKit --stacktrace
+          ./gradlew :arc-core:jnigenBuildAllIOS :arc-core:jnigenPackageAllIOS :backends:backend-robovm:extractMetalANGLEKit --stacktrace
           ARC_IOS_JAR="$(find arc-core/build/natives -maxdepth 1 -type f -name '*natives-ios*.jar' -print -quit)"
           if [ -z "$ARC_IOS_JAR" ]; then
             echo "Arc iOS natives jar was not generated."
